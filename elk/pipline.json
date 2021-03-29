@@ -1,0 +1,65 @@
+{"processors":[
+  {
+    "grok": {
+      "field": "message",
+      "patterns": [
+        "Started %{WORD:request.method} %{DATA:request.url} for %{IPORHOST:request.host} at %{TIMESTAMP_ISO8601:request.time}"
+      ],
+      "ignore_missing": true,
+      "ignore_failure": true
+    }
+  },
+  {
+    "grok": {
+      "field": "message",
+      "patterns": [
+        "Parameters: %{PARAMS:request.params}"
+      ],
+      "pattern_definitions": {
+        "PARAMS": "{%{DATA}}"
+      },
+      "ignore_missing": true,
+      "ignore_failure": true
+    }
+  },
+  {
+    "grok": {
+      "field": "message",
+      "patterns": [
+        "Completed %{WORD:response.status:long} "
+      ],
+      "ignore_missing": true,
+      "ignore_failure": true
+    }
+  },
+  {
+    "grok": {
+      "field": "message",
+      "patterns": [
+        "Completed %{WORD} OK in %{BASE10NUM:response.total}ms"
+      ],
+      "if": "ctx?.response?.status != null && ctx.response.status < 400"
+    }
+  },
+  {
+    "grok": {
+      "field": "message",
+      "patterns": [
+        "Completed %{DATA} in %{BASE10NUM:response.total}ms"
+      ],
+      "if": "ctx?.response?.status != null && ctx.response.status >= 400"
+    }
+  },
+  {
+    "grok": {
+      "field": "message",
+      "patterns": [
+        "%{ERROR_MESSAGE:response.error_message}"
+      ],
+      "pattern_definitions": {
+        "ERROR_MESSAGE": "ActiveRecord::%{GREEDYDATA}"
+      },
+      "if": "ctx?.response?.status != null && ctx.response.status >= 400"
+    }
+  }
+]}

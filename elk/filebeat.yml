@@ -1,0 +1,72 @@
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/*log
+  fields:
+    log_type: 'nginx'
+- type: log
+  enabled: true
+  paths:
+    - /app/log/production*log
+  fields:
+    log_type: 'rails'
+  multiline.pattern: 'Started\s(POST|GET|PUT|PATCH|DELETE|OPTIONS)'
+  multiline.negate: true
+  multiline.match: after
+  multiline.flush_pattern: '/Completed\s\d.*?\(*?\)$/'
+
+#============================= Filebeat modules ===============================
+
+filebeat.config.modules:
+  # Glob pattern for configuration loading
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+#==================== Elasticsearch template setting ==========================
+
+setup.template.settings:
+  index.number_of_shards: 1
+
+setup.template.name: 'np-${FILEBEAT_ENV}'
+setup.template.pattern: 'np-${FILEBEAT_ENV}-*'
+setup.template.enabled: true
+setup.template.overwrite: true
+setup.dashboards.index: "np-${FILEBEAT_ENV}*"
+setup.ilm.enabled: false
+
+setup.kibana:
+  host: '${KIBANA_HOST}'
+
+#-------------------------- Elasticsearch output ------------------------------
+output.elasticsearch:
+  hosts: '${ES_HOSTS}'
+  index: "np-${FILEBEAT_ENV}-*"
+
+  indices:
+    - index: "np-${FILEBEAT_ENV}-log-%{+yyyy.MM.dd}"
+      pipeline: "np-rails-log-pipeline"
+      when.equals:
+        fields:
+          log_type: 'rails'
+    - index: "np-${FILEBEAT_ENV}-nginx-log-%{+yyyy.MM.dd}"
+      pipeline: "np-nginx-log-pipeline"
+      when.equals:
+        fields:
+          log_type: 'nginx'
+
+processors:
+  - add_host_metadata: ~
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 3
+
+
+
+
+# cd /etc/filebeat
+#filebeat -E FILEBEAT_ENV='development' -E ES_HOSTS="192.168.213.50:9200" -E KIBANA_HOST=192.168.213.50:5601 &
